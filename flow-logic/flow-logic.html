@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Neon Flow</title>
+    <style>
+        :root {
+            --bg-color: #152030;
+            --grid-bg: #0f1724;
+            --cell-border: #24344d;
+            --line-width: 16px;
+            --dot-size: 60%;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            color: white;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        h1 {
+            font-weight: 300;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-shadow: 0 0 15px rgba(255,255,255,0.4);
+            margin-bottom: 5px;
+        }
+
+        p {
+            color: #6d83a3;
+            font-size: 14px;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+        }
+
+        button {
+            background: transparent;
+            border: 2px solid #4fa3d1;
+            color: #4fa3d1;
+            padding: 10px 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background: #4fa3d1;
+            color: #152030;
+            box-shadow: 0 0 20px #4fa3d1;
+        }
+
+        #game-board {
+            display: grid;
+            /* Gap 0, borders handled by cells to prevent visual breaks */
+            gap: 0;
+            border: 4px solid var(--cell-border);
+            border-radius: 10px;
+            background-color: var(--cell-border);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .cell {
+            background-color: var(--grid-bg);
+            border: 1px solid var(--cell-border);
+            box-sizing: border-box; /* Important for borders */
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Dots */
+        .dot {
+            width: var(--dot-size);
+            height: var(--dot-size);
+            border-radius: 50%;
+            z-index: 10;
+            box-shadow: inset 0 0 8px rgba(0,0,0,0.5), 0 0 15px currentColor;
+            transition: transform 0.2s;
+            transform: scale(0.9);
+        }
+
+        .dot.connected {
+            transform: scale(1.1);
+            box-shadow: inset 0 0 5px rgba(255,255,255,0.3), 0 0 25px currentColor;
+        }
+
+        /* Paths */
+        .path {
+            position: absolute;
+            background-color: currentColor;
+            box-shadow: 0 0 15px currentColor;
+            z-index: 5;
+            border-radius: 10px; /* Smooth segment ends */
+        }
+
+        /* Path geometry for seamless joins */
+        .path.center { width: var(--line-width); height: var(--line-width); border-radius: 50%; }
+        /* Extend length to overlap cell borders */
+        .path.up { width: var(--line-width); height: 60%; top: -10%; left: 50%; transform: translateX(-50%); border-radius: 0; }
+        .path.down { width: var(--line-width); height: 60%; bottom: -10%; left: 50%; transform: translateX(-50%); border-radius: 0; }
+        .path.left { height: var(--line-width); width: 60%; left: -10%; top: 50%; transform: translateY(-50%); border-radius: 0; }
+        .path.right { height: var(--line-width); width: 60%; right: -10%; top: 50%; transform: translateY(-50%); border-radius: 0; }
+
+        #win-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(21, 32, 48, 0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+        }
+
+        .win-box {
+            background: #1e2f45;
+            padding: 40px;
+            border-radius: 20px;
+            border: 2px solid #4fa3d1;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(79, 163, 209, 0.2);
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Flow Logic</h1>
+    <p>100% Solvable & Fillable</p>
+
+    <div class="controls">
+        <button onclick="generateLevel()">New Level</button>
+        <button onclick="restartLevel()">Reset</button>
+    </div>
+
+    <div id="game-board"></div>
+
+    <div id="win-screen">
+        <div class="win-box">
+            <h2 style="margin-top:0">LEVEL CLEARED!</h2>
+            <button onclick="generateLevel()">Next Puzzle</button>
+        </div>
+    </div>
+
+    <script>
+        const GRID_SIZE = 6; // 6x6
+        const CELL_SIZE = 60;
+
+        // Bright colors
+        const PALETTE = [
+            '#FF0040', // Red
+            '#00FF80', // Spring Green
+            '#0080FF', // Azure
+            '#FFFF00', // Yellow
+            '#AA00FF', // Violet
+            '#FF8000', // Orange
+            '#FFFFFF', // White
+            '#FF00FF'  // Magenta
+        ];
+
+        let grid = []; // Game state
+        let isDrawing = false;
+        let currentPathColor = null;
+        let lastCell = null;
+        let winTimeout = null;
+
+        const boardEl = document.getElementById('game-board');
+        const winScreen = document.getElementById('win-screen');
+
+        // ============================================================
+        // SOLVABLE LEVEL GENERATOR
+        // ============================================================
+
+        function generateLevel() {
+            clearTimeout(winTimeout);
+            winScreen.style.display = 'none';
+
+            // Try to generate a level. If the algorithm paints itself into a corner, retry.
+            // On a 6x6 board this is effectively instant (usually < 10 ms).
+            let success = false;
+            let attempts = 0;
+
+            while (!success && attempts < 200) {
+                success = tryBuildFullGrid();
+                attempts++;
+            }
+
+            if (!success) {
+                console.warn("Не удалось сгенерировать сложный уровень, пробую упрощенный...");
+                // Fall back to simple logic if we get extremely unlucky (very rare)
+                fallbackGenerator();
+            }
+
+            initDOM();
+        }
+
+        // "Fill Worm" algorithm
+        function tryBuildFullGrid() {
+            // 1. Create an empty map
+            let map = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(false)); // false = empty
+            let paths = []; // Completed paths are stored here
+            let emptyCount = GRID_SIZE * GRID_SIZE;
+            let colorIdx = 0;
+
+            // 2. While there are empty cells
+            let safetyLoop = 0;
+            while (emptyCount > 0 && safetyLoop < 100) {
+                safetyLoop++;
+
+                // Find an empty cell to start from
+                let start = findFirstEmpty(map);
+                if (!start) break;
+
+                // Start the random walk
+                let path = [start];
+                map[start.y][start.x] = true; // Temporarily mark as occupied
+                let current = start;
+                let steps = 0;
+
+                // Keep walking while possible
+                while (true) {
+                    let neighbors = getNeighbors(current);
+                    // Valid neighbors: inside the board and NOT occupied
+                    let valid = neighbors.filter(n => !map[n.y][n.x]);
+
+                    // Heuristic: to avoid leaving holes, prefer neighbors with the fewest
+                    // free neighbors so corners and tight spaces get filled first
+                    if (valid.length === 0) break;
+
+                    // Sort neighbors by their free-neighbor count (fewest first)
+                    // This helps the snake fill dead ends
+                    valid.sort((a, b) => countFreeNeighbors(a, map) - countFreeNeighbors(b, map));
+
+                    // Take the best candidate (or randomly one of the best)
+                    let next = valid[0];
+                    // Add a bit of randomness so paths vary
+                    if (valid.length > 1 && Math.random() > 0.3) {
+                        next = valid[Math.floor(Math.random() * Math.min(valid.length, 2))];
+                    }
+
+                    path.push(next);
+                    map[next.y][next.x] = true;
+                    current = next;
+                    steps++;
+
+                    // Randomly stop the path once it is long enough,
+                    // leaving room for other colors without doing it too often
+                    if (steps > 3 && Math.random() > 0.85) break;
+                }
+
+                // Validate the generated path
+                // 1. The path must be >= 3 cells (very short ones are uninteresting and glitchy)
+                // 2. The start and end must not be adjacent (user requirement)
+                const head = path[0];
+                const tail = path[path.length-1];
+                const dist = Math.abs(head.x - tail.x) + Math.abs(head.y - tail.y);
+
+                if (path.length >= 3 && dist > 1) {
+                    // No more colors available — retry the whole grid
+                    if (colorIdx >= PALETTE.length) return false;
+                    paths.push({
+                        color: PALETTE[colorIdx],
+                        cells: path
+                    });
+                    colorIdx++;
+                    emptyCount -= path.length;
+                } else {
+                    // Bad path (too short or endpoints adjacent). Roll back the map.
+                    path.forEach(p => map[p.y][p.x] = false);
+
+                    // Dead start means the whole attempt is hopeless — retry.
+                    if (emptyCount === GRID_SIZE * GRID_SIZE) return false;
+
+                    // An isolated cell (no valid neighbors from the start) can never be
+                    // incorporated — retrying from it would spin the loop 100 times for nothing.
+                    if (path.length === 1) return false;
+
+                    break;
+                }
+            }
+
+            // If we filled all cells
+            if (emptyCount === 0) {
+                applyToGrid(paths);
+                return true;
+            }
+            return false; // Could not fill the board completely, retry
+        }
+
+        function findFirstEmpty(map) {
+            for(let y=0; y<GRID_SIZE; y++) {
+                for(let x=0; x<GRID_SIZE; x++) {
+                    if (!map[y][x]) return {x, y};
+                }
+            }
+            return null;
+        }
+
+        function countFreeNeighbors(cell, map) {
+            let n = getNeighbors(cell);
+            return n.filter(c => !map[c.y][c.x]).length;
+        }
+
+        function getNeighbors(c) {
+            let res = [];
+            const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+            for(let d of dirs) {
+                let nx = c.x + d[0], ny = c.y + d[1];
+                if(nx>=0 && nx<GRID_SIZE && ny>=0 && ny<GRID_SIZE) res.push({x:nx, y:ny});
+            }
+            return res;
+        }
+
+        function applyToGrid(paths) {
+            // Initialize the data structure
+            grid = Array(GRID_SIZE).fill().map((_, y) =>
+                Array(GRID_SIZE).fill().map((_, x) => ({
+                    x, y,
+                    color: null,
+                    isDot: false,
+                    lineColor: null,
+                    directions: new Set()
+                }))
+            );
+
+            // Place the dots
+            paths.forEach(p => {
+                const start = p.cells[0];
+                const end = p.cells[p.cells.length - 1];
+
+                grid[start.y][start.x].isDot = true;
+                grid[start.y][start.x].color = p.color;
+
+                grid[end.y][end.x].isDot = true;
+                grid[end.y][end.x].color = p.color;
+            });
+        }
+
+        function fallbackGenerator() {
+            // Simple guaranteed fallback: 6 horizontal snake paths, one per row.
+            // Each path runs left-to-right on even rows and right-to-left on odd rows
+            // so endpoints are never adjacent across rows.
+            const paths = [];
+            for (let row = 0; row < GRID_SIZE; row++) {
+                const cells = [];
+                for (let col = 0; col < GRID_SIZE; col++) {
+                    const x = (row % 2 === 0) ? col : (GRID_SIZE - 1 - col);
+                    cells.push({ x, y: row });
+                }
+                paths.push({ color: PALETTE[row], cells });
+            }
+            applyToGrid(paths);
+        }
+
+        // ============================================================
+        // GAME LOGIC (UI)
+        // ============================================================
+
+        function initDOM() {
+            boardEl.innerHTML = '';
+            boardEl.style.gridTemplateColumns = `repeat(${GRID_SIZE}, ${CELL_SIZE}px)`;
+            boardEl.style.gridTemplateRows = `repeat(${GRID_SIZE}, ${CELL_SIZE}px)`;
+
+            for(let y=0; y<GRID_SIZE; y++) {
+                for(let x=0; x<GRID_SIZE; x++) {
+                    const cellData = grid[y][x];
+                    const el = document.createElement('div');
+                    el.className = 'cell';
+                    el.dataset.x = x;
+                    el.dataset.y = y;
+
+                    if (cellData.isDot) {
+                        const dot = document.createElement('div');
+                        dot.className = 'dot';
+                        dot.style.color = cellData.color;
+                        dot.style.backgroundColor = cellData.color;
+                        el.appendChild(dot);
+                    }
+
+                    // Mouse & Touch Events
+                    el.addEventListener('mousedown', (e) => startPath(cellData));
+                    el.addEventListener('mouseenter', (e) => movePath(cellData));
+
+                    // Prevent touch scroll
+                    el.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        startPath(cellData);
+                    }, {passive: false});
+
+                    boardEl.appendChild(el);
+                }
+            }
+
+            // Global touch handling
+            document.removeEventListener('touchmove', onTouchMove);
+            document.addEventListener('touchmove', onTouchMove, {passive: false});
+
+            document.removeEventListener('mouseup', endPath);
+            document.removeEventListener('touchend', endPath);
+            document.addEventListener('mouseup', endPath);
+            document.addEventListener('touchend', endPath);
+        }
+
+        function restartLevel() {
+            clearTimeout(winTimeout);
+            // Clear paths
+            grid.forEach(row => row.forEach(c => {
+                c.lineColor = null;
+                c.directions.clear();
+            }));
+            renderBoard();
+            winScreen.style.display = 'none';
+        }
+
+        // --- Drawing Logic ---
+
+        function startPath(cell) {
+            if (cell.isDot) {
+                isDrawing = true;
+                currentPathColor = cell.color;
+                lastCell = cell;
+
+                // If a dot was clicked, erase the old line of this color
+                clearPath(currentPathColor);
+
+                cell.lineColor = currentPathColor;
+                renderCell(cell);
+            } else if (cell.lineColor) {
+                // If a line was clicked, break it and start drawing from here
+                isDrawing = true;
+                currentPathColor = cell.lineColor;
+                lastCell = cell;
+                truncatePath(cell); // Trim the tail
+            }
+        }
+
+        function movePath(cell) {
+            if (!isDrawing) return;
+            if (cell === lastCell) return;
+
+            // Check: neighbors only
+            if (Math.abs(cell.x - lastCell.x) + Math.abs(cell.y - lastCell.y) !== 1) return;
+
+            // 1. Backtracking along the current line
+            if (cell.lineColor === currentPathColor && areConnected(cell, lastCell)) {
+                disconnect(lastCell, cell);
+                lastCell = cell;
+                return;
+            }
+
+            // 2. Blocking: cannot move onto another color or dot
+            if (cell.isDot && cell.color !== currentPathColor) return;
+            if (!cell.isDot && cell.lineColor !== null) return; // Occupied
+
+            // 3. Draw forward
+            connect(lastCell, cell, currentPathColor);
+            lastCell = cell;
+
+            // 4. Victory? (If we reached a dot of the same color)
+            if (cell.isDot && cell.color === currentPathColor) {
+                isDrawing = false;
+                checkWin();
+            }
+        }
+
+        function onTouchMove(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const t = e.touches[0];
+            const el = document.elementFromPoint(t.clientX, t.clientY);
+            if (el) {
+                const cellEl = el.closest('.cell');
+                if (cellEl) {
+                    const x = parseInt(cellEl.dataset.x);
+                    const y = parseInt(cellEl.dataset.y);
+                    if (grid[y] && grid[y][x]) movePath(grid[y][x]);
+                }
+            }
+        }
+
+        function endPath() {
+            isDrawing = false;
+            lastCell = null;
+            checkWin();
+        }
+
+        // --- Graph Helpers ---
+
+        function connect(a, b, color) {
+            a.directions.add(getDir(a, b));
+            a.lineColor = color;
+            b.directions.add(getDir(b, a));
+            b.lineColor = color;
+            renderCell(a); renderCell(b);
+        }
+
+        function disconnect(a, b) {
+            a.directions.delete(getDir(a, b));
+            if (a.directions.size === 0 && !a.isDot) a.lineColor = null;
+            b.directions.delete(getDir(b, a));
+            if (b.directions.size === 0 && !b.isDot) b.lineColor = null;
+            renderCell(a); renderCell(b);
+        }
+
+        function clearPath(color) {
+            grid.forEach(row => row.forEach(c => {
+                if (c.lineColor === color) {
+                    c.directions.clear();
+                    if (!c.isDot) c.lineColor = null;
+                    renderCell(c);
+                }
+            }));
+        }
+
+        function truncatePath(startNode) {
+            // For stability in this version, breaking a line clears the entire color and restarts it
+            // This prevents loop-related glitches
+            const c = startNode.lineColor;
+            clearPath(c);
+            startNode.lineColor = c;
+            renderCell(startNode);
+        }
+
+        function getDir(from, to) {
+            if (from.x < to.x) return 'right';
+            if (from.x > to.x) return 'left';
+            if (from.y < to.y) return 'down';
+            if (from.y > to.y) return 'up';
+            return '';
+        }
+
+        function areConnected(a, b) {
+            return a.directions.has(getDir(a, b));
+        }
+
+        // --- Rendering ---
+
+        function renderBoard() {
+            grid.forEach(row => row.forEach(renderCell));
+        }
+
+        function renderCell(cell) {
+            const idx = cell.y * GRID_SIZE + cell.x;
+            const el = boardEl.children[idx];
+            if (!el) return;
+
+            // Clear old path segments
+            el.querySelectorAll('.path').forEach(p => p.remove());
+            const dot = el.querySelector('.dot');
+            if (dot) dot.classList.remove('connected');
+
+            // Draw new path segments
+            if (cell.lineColor && (cell.directions.size > 0 || cell.isDot)) {
+                cell.directions.forEach(dir => {
+                    const line = document.createElement('div');
+                    line.className = `path ${dir}`;
+                    line.style.color = cell.lineColor;
+                    line.style.backgroundColor = cell.lineColor;
+                    el.appendChild(line);
+                });
+
+                // Center segment
+                if (cell.directions.size > 1 || (cell.isDot && cell.directions.size > 0)) {
+                    const center = document.createElement('div');
+                    center.className = 'path center';
+                    center.style.color = cell.lineColor;
+                    center.style.backgroundColor = cell.lineColor;
+                    el.appendChild(center);
+                }
+
+                if (dot && cell.directions.size > 0) {
+                    dot.classList.add('connected');
+                }
+            }
+        }
+
+        // --- Win Check ---
+
+        function checkWin() {
+            // The drawing mechanics guarantee that if both dots of a color have directions,
+            // they are connected: every draw starts from a dot (clearPath wipes the whole
+            // color first) and ends only when the other dot is reached.
+            // So isFull + allDots is a sufficient and correct win condition.
+            let isFull = true;
+            let allDots = true;
+
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const c = grid[y][x];
+                    if (!c.isDot && !c.lineColor) isFull = false;
+                    if (c.isDot && c.directions.size === 0) allDots = false;
+                }
+            }
+
+            if (isFull && allDots) {
+                winTimeout = setTimeout(() => { winScreen.style.display = 'flex'; }, 100);
+            }
+        }
+
+        // Start game
+        generateLevel();
+
+    </script>
+</body>
+</html>

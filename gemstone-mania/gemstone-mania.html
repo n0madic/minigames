@@ -1,0 +1,1352 @@
+<!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://code.jquery.com https://unpkg.com https://d3js.org https://threejs.org https://cdn.plot.ly https://stackpath.bootstrapcdn.com https://maps.googleapis.com https://cdn.tailwindcss.com https://ajax.googleapis.com https://kit.fontawesome.com https://cdn.datatables.net https://maxcdn.bootstrapcdn.com https://code.highcharts.com https://tako-static-assets-production.s3.amazonaws.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://pfst.cf2.poecdn.net https://puc.poecdn.net https://i.imgur.com https://wikimedia.org https://*.icons8.com https://*.giphy.com https://picsum.photos https://images.unsplash.com; frame-src 'self' https://www.youtube.com https://trytako.com; child-src 'self'; manifest-src 'self'; worker-src 'self'; upgrade-insecure-requests; block-all-mixed-content;">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemstone Mania</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #222;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 100%;
+            position: relative;
+        }
+
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 356px; /* Board size (8*40px + 2*10px padding + 2*2px border + 7*2px gap) */
+            margin-bottom: 10px;
+        }
+
+        .score-board, .time-board {
+            font-size: 18px;
+            background-color: #333;
+            padding: 5px 10px;
+            border-radius: 8px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            gap: 2px;
+            background-color: #444;
+            border: 2px solid #555;
+            border-radius: 10px;
+            padding: 10px;
+            max-width: 100%;
+            box-sizing: border-box;
+            overflow: hidden; /* Prevents the container from jumping */
+            touch-action: none; /* Required for proper swipe handling */
+        }
+
+        .gem {
+            width: 40px;
+            height: 40px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.2s, opacity 0.2s;
+            position: relative;
+            box-shadow: inset 0 0 10px rgba(255,255,255,0.3);
+            z-index: 1;
+        }
+
+        .gem.selected {
+            transform: scale(0.9);
+            box-shadow: 0 0 10px white, inset 0 0 10px rgba(255,255,255,0.5);
+        }
+
+        .gem.matched {
+            animation: pulse 0.5s;
+            opacity: 0.3;
+        }
+
+        .gem.fall {
+            animation: fall 0.5s ease-out forwards;
+            transform-origin: top;
+        }
+
+        .gem.hint {
+            animation: hint-pulse 1.5s infinite;
+            box-shadow: 0 0 15px gold, inset 0 0 10px rgba(255,255,255,0.5);
+        }
+
+        /* Gem swap animations */
+        .gem.swap-right {
+            animation: swapRight 0.3s ease-in-out;
+            z-index: 2;
+        }
+
+        .gem.swap-left {
+            animation: swapLeft 0.3s ease-in-out;
+            z-index: 2;
+        }
+
+        .gem.swap-up {
+            animation: swapUp 0.3s ease-in-out;
+            z-index: 2;
+        }
+
+        .gem.swap-down {
+            animation: swapDown 0.3s ease-in-out;
+            z-index: 2;
+        }
+
+        @keyframes swapRight {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(calc(100% + 2px)); }
+        }
+
+        @keyframes swapLeft {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(calc(-100% - 2px)); }
+        }
+
+        @keyframes swapUp {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(calc(-100% - 2px)); }
+        }
+
+        @keyframes swapDown {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(calc(100% + 2px)); }
+        }
+
+        /* Revert animations for failed swaps */
+        .gem.swap-right-back {
+            animation: swapRightBack 0.3s ease-in-out;
+            z-index: 2;
+        }
+
+        .gem.swap-left-back {
+            animation: swapLeftBack 0.3s ease-in-out;
+            z-index: 2;
+        }
+
+        .gem.swap-up-back {
+            animation: swapUpBack 0.3s ease-in-out;
+            z-index: 2;
+        }
+
+        .gem.swap-down-back {
+            animation: swapDownBack 0.3s ease-in-out;
+            z-index: 2;
+        }
+
+        @keyframes swapRightBack {
+            0% { transform: translateX(calc(100% + 2px)); }
+            100% { transform: translateX(0); }
+        }
+
+        @keyframes swapLeftBack {
+            0% { transform: translateX(calc(-100% - 2px)); }
+            100% { transform: translateX(0); }
+        }
+
+        @keyframes swapUpBack {
+            0% { transform: translateY(calc(-100% - 2px)); }
+            100% { transform: translateY(0); }
+        }
+
+        @keyframes swapDownBack {
+            0% { transform: translateY(calc(100% + 2px)); }
+            100% { transform: translateY(0); }
+        }
+
+        @keyframes hint-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes fall {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(0); }
+        }
+
+        /* Gem colors */
+        .red { background: radial-gradient(circle at 30% 30%, #ff5555, #cc0000); }
+        .blue { background: radial-gradient(circle at 30% 30%, #5555ff, #0000cc); }
+        .green { background: radial-gradient(circle at 30% 30%, #55ff55, #00cc00); }
+        .yellow { background: radial-gradient(circle at 30% 30%, #ffff55, #cccc00); }
+        .purple { background: radial-gradient(circle at 30% 30%, #ff55ff, #cc00cc); }
+        .cyan { background: radial-gradient(circle at 30% 30%, #55ffff, #00cccc); }
+        .orange { background: radial-gradient(circle at 30% 30%, #ff9955, #cc6600); }
+
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+            max-width: 356px;
+        }
+
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 2px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+            flex: 1;
+            min-width: 70px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button#sound-toggle {
+            background-color: #f44336;
+        }
+
+        button#sound-toggle.muted {
+            background-color: #999;
+        }
+
+        button#hint {
+            background-color: #2196F3;
+        }
+
+        button#hint:hover {
+            background-color: #0b7dda;
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+            gap: 10px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 28px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+
+        /* Game Over Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: #333;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            max-width: 80%;
+            animation: modalAppear 0.5s;
+            box-shadow: 0 0 30px #555;
+        }
+
+        @keyframes modalAppear {
+            from {transform: scale(0.8); opacity: 0;}
+            to {transform: scale(1); opacity: 1;}
+        }
+
+        .modal h2 {
+            color: #f8f8f8;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .modal p {
+            font-size: 20px;
+            margin-bottom: 20px;
+        }
+
+        .modal .score-display {
+            font-size: 36px;
+            font-weight: bold;
+            color: gold;
+            margin: 20px 0;
+            text-shadow: 0 0 10px rgba(255,215,0,0.5);
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .modal button {
+            padding: 12px 25px;
+            font-size: 18px;
+        }
+
+        /* Responsive styles */
+        @media (max-width: 500px) {
+            .gem {
+                width: 35px;
+                height: 35px;
+            }
+
+            .info-panel {
+                max-width: 315px; /* Adjusted for smaller gems */
+            }
+
+            .controls {
+                max-width: 315px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .gem {
+                width: 30px;
+                height: 30px;
+            }
+
+            .info-panel {
+                max-width: 272px; /* Adjusted for smaller gems */
+            }
+
+            .controls {
+                max-width: 272px;
+            }
+
+            .modal-content {
+                padding: 20px;
+            }
+
+            .modal h2 {
+                font-size: 24px;
+            }
+
+            .modal p {
+                font-size: 16px;
+            }
+
+            .modal .score-display {
+                font-size: 28px;
+            }
+        }
+
+        @media (max-width: 350px) {
+            .gem {
+                width: 25px;
+                height: 25px;
+            }
+
+            .info-panel {
+                max-width: 229px; /* Adjusted for smaller gems */
+            }
+
+            .controls {
+                max-width: 229px;
+            }
+
+            button {
+                padding: 6px 8px;
+                font-size: 12px;
+                min-width: 60px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Gemstone Mania</h1>
+        <div class="info-panel">
+            <div class="score-board">Score: <span id="score">0</span></div>
+            <div class="time-board">Time: <span id="time">60</span></div>
+        </div>
+        <div class="game-board" id="board"></div>
+        <div class="controls">
+            <button id="restart">Restart</button>
+            <button id="hint">Hint</button>
+            <button id="sound-toggle">Mute</button>
+        </div>
+        <div class="toggle-container">
+            <label class="switch">
+                <input type="checkbox" id="unlimited-time">
+                <span class="slider"></span>
+            </label>
+            <span>Unlimited Time</span>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="gameOverModal" class="modal">
+        <div class="modal-content">
+            <h2>Game Over!</h2>
+            <p>Time's up! Your final score is:</p>
+            <div class="score-display" id="finalScore">0</div>
+            <div class="modal-buttons">
+                <button id="playAgain">Play Again</button>
+                <button id="closeModal">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game variables
+        const BOARD_SIZE = 8;
+        const GEM_TYPES = ['red', 'blue', 'green', 'yellow', 'purple', 'cyan', 'orange'];
+        let board = [];
+        let score = 0;
+        let selectedGem = null;
+        let isSwapping = false;
+        let isProcessingMatches = false;
+        let gameTime = 60;
+        let gameTimer = null;
+        let soundEnabled = true;
+        let fallingGems = []; // Track which gems should fall
+        let hintTimeout = null;
+        let isHintVisible = false;
+        let unlimitedTime = false;
+        let gameEnded = false;
+
+        // Variables for swipe handling
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchStartRow = -1;
+        let touchStartCol = -1;
+        const MIN_SWIPE_DISTANCE = 30; // Minimum distance required to register a swipe
+
+        // Sound effects
+        const sounds = {
+            select: new Audio("data:audio/wav;base64,UklGRl4BAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YToBAACAgICAgICAgICAgIP8/MSZmZmZmZmZmZn//wAAAAAAAP+ZmZmZmZmZmcz8//////8AAJmZmZmZmZmZzPz//////wAAmZmZmZmZmZnM/P//////AACZmZmZmZmZmcz8//////8AAJmZmZmZmZmZzPz//////wAAmZmZmZmZmZnM/P/////yx8fHx8fHx8fH4wAAAAAA/8fHx8fHx8fHx+P///////LHx8fHx8fHx8fjAAAAAAD/x8fHx8fHx8fH4////////8fHx8fHx8fHx+P///////+ZmZmZmZmZmZn//wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+            match: new Audio("data:audio/wav;base64,UklGRrgBAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YZQBAACBgYGBgYGBgYGBgYGBgYGBfEtLS0tLS0tLS0tLdP////////9LS0tLS0tLS0tLS3T/////////S0tLS0tLS0tLS0t0/////////0tLS0tLS0tLS0tLdP////////9LS0tLS0tLS0tLS3T/////////S0tLS0tLS0tLS0t0//////+EXl5eXl5eXl5eXl5eXnpWVlZWVlZWVlZWVlZleHh4eHh4eHh4eHh4eGllZWVlZWVlZWVlZWVlcMfHx8fHx8fHx8fHx6Ojo6Ojo6Ojo6Ojo6Ojenp6enp6enp6enp6emZmZmZmZmZmZmZmZmZmampqampqampqampqamp8fHx8fHx8fHx8fHx8gYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYE="),
+            swap: new Audio("data:audio/wav;base64,UklGRlgBAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YTQBAAB8fHx8fHx8fHx8fHx8fHx8fGBoaGhoaGhoaGhoaGhoaIh/f39/f39/f39/f39/f9bW1tbW1tbW1tbW1tbWwZ2dnZ2dnZ2dnZ2dnZ2dsLCwsLCwsLCwsLCwsLCwxsbGxsbGxsbGxsbGxsbDxcXFxcXFxcXFxcXFxcXGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcWAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA=="),
+            noMatch: new Audio("data:audio/wav;base64,UklGRmQBAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YUABAAB/f39/f39/f39/f39/f39/f39/f39/f39/f39/f38AAAAAAABz////////////////////c3Nzc3Nzc3Nzc3Nzc///////////////////c3Nzc3Nzc3Nzc3Nzc///////////////////c3Nzc3Nzc3Nzc3Nzc///////////////////c3Nzc3Nzc3Nzc3Nzc///////////////////c3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3P///////9zc3Nzc3Nzc3Nzc3Nz////////c3Nzc3Nzc3Nzc3Nzc////////3Nzc3Nzc3Nzc3Nzc3P///////9zc3Nzc3Nzc3Nzc3Nz////////c3Nzc3Nzc3Nzc3Nzc////////w=="),
+            hint: new Audio("data:audio/wav;base64,UklGRkQBAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YSABAACA//+A//+A//+A//+A//+A//+A//+A//+A//+A//+A//+AgP//f3////////////////////9/f39/f39/f39/f39/f//////////////////////8/Pz8/Pz8/Pz8/Pz8/P//////////////////////////j4+Pj4+Pj4+Pj4+Pj///////////////////////X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX1///////w=="),
+            gameOver: new Audio("data:audio/wav;base64,UklGRroBAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YZYBAACZmZmZmZmZmZmZmZmZmZmZmXd3d3d3d3d3d3d3d3d3d4BhYWFhYWFhYWFhYWFhYaHOzs7Ozs7Ozs7Ozs7OzpZAQEBAQEBAQEBAQEBAPP//////////////////////////////////////////cXFxcXFxcXFxcXFxcXFxiP///////////////////////9TU1NTU1NTU1NTU1NTU1KH//////////////////6ZnZ2dnZ2dnZ2dnZ2dnboP///////////////////9paWlpaWlpaWlpaWlpaXaL////////////////////enp6enp6enp6enp6ent+j4+Pj4+Pj4+Pj4+Pj4+PbGxsbGxsbGxsbGxsbGxoTExMTExMTExMTExMTExIAAAAAAAAAAAAAAAAAAAAAA==")
+        };
+
+        // Check whether localStorage is available
+        function isLocalStorageAvailable() {
+            try {
+                const testKey = '__gemstoneManiaTest__';
+                localStorage.setItem(testKey, testKey);
+                localStorage.removeItem(testKey);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // Save the game state
+        function saveGameState() {
+            if (!isLocalStorageAvailable()) return;
+
+            try {
+                const gameState = {
+                    board: board,
+                    score: score,
+                    gameTime: gameTime,
+                    unlimitedTime: unlimitedTime,
+                    soundEnabled: soundEnabled
+                };
+
+                localStorage.setItem('gemstoneManiaState', JSON.stringify(gameState));
+            } catch (e) {
+                console.error('Failed to save game state:', e);
+            }
+        }
+
+        // Load the game state
+        function loadGameState() {
+            if (!isLocalStorageAvailable()) return false;
+
+            try {
+                const savedState = localStorage.getItem('gemstoneManiaState');
+                if (!savedState) return false;
+
+                const gameState = JSON.parse(savedState);
+
+                // Restore the saved game state
+                board = gameState.board;
+                score = gameState.score;
+                gameTime = gameState.gameTime;
+                unlimitedTime = gameState.unlimitedTime;
+                soundEnabled = gameState.soundEnabled !== undefined ? gameState.soundEnabled : true;
+
+                // Update the UI
+                document.getElementById('score').textContent = score;
+                document.getElementById('finalScore').textContent = score;
+                document.getElementById('unlimited-time').checked = unlimitedTime;
+
+                // Update the sound toggle
+                const soundButton = document.getElementById('sound-toggle');
+                if (soundEnabled) {
+                    soundButton.textContent = "Mute";
+                    soundButton.classList.remove('muted');
+                } else {
+                    soundButton.textContent = "Sound";
+                    soundButton.classList.add('muted');
+                }
+
+                // Update the time display
+                if (unlimitedTime) {
+                    document.getElementById('time').textContent = "∞";
+                } else {
+                    document.getElementById('time').textContent = gameTime;
+                }
+
+                return true;
+            } catch (e) {
+                console.error('Failed to load game state:', e);
+                return false;
+            }
+        }
+
+        // Initialize the game
+        function initGame() {
+            // Try to load the saved state
+            const loaded = loadGameState();
+
+            if (!loaded) {
+                // If no save exists, create a new game
+                createBoard();
+            }
+
+            renderBoard();
+
+            // Set up game timer — preserve saved time on resume, reset on fresh game
+            resetTimer(!loaded);
+
+            // Always clear any matched gems that may have been saved mid-cascade
+            checkAndRemoveMatches();
+
+            // Set up event listeners for buttons
+            document.getElementById('restart').addEventListener('click', restartGame);
+            document.getElementById('sound-toggle').addEventListener('click', toggleSound);
+            document.getElementById('hint').addEventListener('click', showHint);
+            document.getElementById('unlimited-time').addEventListener('change', toggleUnlimitedTime);
+
+            // Game over modal buttons
+            document.getElementById('playAgain').addEventListener('click', () => {
+                document.getElementById('gameOverModal').style.display = 'none';
+                restartGame();
+            });
+            document.getElementById('closeModal').addEventListener('click', () => {
+                document.getElementById('gameOverModal').style.display = 'none';
+            });
+
+            // Set up swipe handlers
+            setupSwipeHandlers();
+        }
+
+        // Set up swipe handlers for mobile devices
+        function setupSwipeHandlers() {
+            const boardElement = document.getElementById('board');
+
+            // Touch start
+            boardElement.addEventListener('touchstart', (e) => {
+                if (isSwapping || isProcessingMatches || gameTime <= 0 || gameEnded) return;
+
+                // Capture the first touch point
+                const touch = e.touches[0];
+                touchStartX = touch.clientX;
+                touchStartY = touch.clientY;
+
+                // Determine which gem the swipe started on
+                const element = document.elementFromPoint(touchStartX, touchStartY);
+                if (element && element.classList.contains('gem')) {
+                    touchStartRow = parseInt(element.dataset.row);
+                    touchStartCol = parseInt(element.dataset.col);
+
+                    // Highlight the starting gem as selected
+                    element.classList.add('selected');
+
+                    // Clear any previous hint
+                    clearHint();
+
+                    // Play the selection sound
+                    playSound('select');
+                }
+            });
+
+            // Touch move
+            boardElement.addEventListener('touchmove', (e) => {
+                // Prevent page scrolling while swiping on the board
+                e.preventDefault();
+            });
+
+            // Touch end
+            boardElement.addEventListener('touchend', (e) => {
+                if (isSwapping || isProcessingMatches || gameTime <= 0 || gameEnded || touchStartRow < 0) return;
+
+                // Capture the swipe end coordinates
+                const touch = e.changedTouches[0];
+                const touchEndX = touch.clientX;
+                const touchEndY = touch.clientY;
+
+                // Calculate swipe distance
+                const diffX = touchEndX - touchStartX;
+                const diffY = touchEndY - touchStartY;
+
+                // Remove the highlight from the starting gem
+                const gems = document.querySelectorAll('.gem');
+                const startIndex = touchStartRow * BOARD_SIZE + touchStartCol;
+                if (gems[startIndex]) {
+                    gems[startIndex].classList.remove('selected');
+                }
+
+                // Detect the swipe direction only if the gesture was long enough
+                const absX = Math.abs(diffX);
+                const absY = Math.abs(diffY);
+
+                if (Math.max(absX, absY) < MIN_SWIPE_DISTANCE) {
+                    // The swipe was too short, treat it like a regular tap
+                    touchStartRow = -1;
+                    touchStartCol = -1;
+                    return;
+                }
+
+                let targetRow = touchStartRow;
+                let targetCol = touchStartCol;
+
+                // Determine the swipe direction (horizontal or vertical)
+                if (absX > absY) {
+                    // Horizontal swipe
+                    targetCol += (diffX > 0) ? 1 : -1;
+                } else {
+                    // Vertical swipe
+                    targetRow += (diffY > 0) ? 1 : -1;
+                }
+
+                // Make sure the target cell is inside the board
+                if (targetRow >= 0 && targetRow < BOARD_SIZE && targetCol >= 0 && targetCol < BOARD_SIZE) {
+                    // Swap the gems
+                    swapGems(touchStartRow, touchStartCol, targetRow, targetCol);
+                }
+
+                // Reset swipe state
+                touchStartRow = -1;
+                touchStartCol = -1;
+            });
+        }
+
+        // Toggle unlimited time mode
+        function toggleUnlimitedTime() {
+            if (gameEnded) return;
+            unlimitedTime = document.getElementById('unlimited-time').checked;
+
+            if (unlimitedTime) {
+                // Stop timer if it's running
+                if (gameTimer) {
+                    clearInterval(gameTimer);
+                    gameTimer = null;
+                }
+
+                // Reset display to show infinity symbol
+                document.getElementById('time').textContent = "∞";
+
+                // Ensure game continues if it was over
+                gameTime = Infinity;
+            } else {
+                // Reset timer with normal time limit
+                gameTime = 60;
+                document.getElementById('time').textContent = gameTime;
+
+                // Start timer if it's not running
+                if (!gameTimer) {
+                    startTimer();
+                }
+            }
+
+            // Save state after changing the mode
+            saveGameState();
+        }
+
+        // Create the game board
+        function createBoard() {
+            board = [];
+
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                const newRow = [];
+                for (let col = 0; col < BOARD_SIZE; col++) {
+                    let gemType;
+                    do {
+                        gemType = GEM_TYPES[Math.floor(Math.random() * GEM_TYPES.length)];
+                    } while (
+                        // Check to avoid creating matches when generating the board
+                        (col >= 2 && newRow[col-1] === gemType && newRow[col-2] === gemType) ||
+                        (row >= 2 && board[row-1][col] === gemType && board[row-2][col] === gemType)
+                    );
+
+                    newRow.push(gemType);
+                }
+                board.push(newRow);
+            }
+
+            // Check whether there is at least one possible move
+            let attempts = 0;
+            while (!hasPossibleMove() && attempts < 10) {
+                // If there are no possible moves, regenerate the board
+                board = [];
+                for (let row = 0; row < BOARD_SIZE; row++) {
+                    const newRow = [];
+                    for (let col = 0; col < BOARD_SIZE; col++) {
+                        let gemType;
+                        do {
+                            gemType = GEM_TYPES[Math.floor(Math.random() * GEM_TYPES.length)];
+                        } while (
+                            (col >= 2 && newRow[col-1] === gemType && newRow[col-2] === gemType) ||
+                            (row >= 2 && board[row-1][col] === gemType && board[row-2][col] === gemType)
+                        );
+
+                        newRow.push(gemType);
+                    }
+                    board.push(newRow);
+                }
+                attempts++;
+            }
+
+            // If several attempts still produce a dead board, force one valid move
+            if (!hasPossibleMove()) {
+                ensurePossibleMove();
+            }
+
+            // Reset the falling-gem list
+            fallingGems = [];
+
+            // Save the initial state
+            saveGameState();
+        }
+
+        // Ensure that at least one valid move exists
+        function ensurePossibleMove() {
+            // Place two matching gems with a third one space away so it can be swapped in.
+            // col+3 must stay within bounds (max index BOARD_SIZE-1), so col <= BOARD_SIZE-4.
+            const row = Math.floor(Math.random() * (BOARD_SIZE - 2));
+            const col = Math.floor(Math.random() * (BOARD_SIZE - 3));
+            const gemType = GEM_TYPES[Math.floor(Math.random() * GEM_TYPES.length)];
+
+            board[row][col]   = gemType;
+            board[row][col+1] = gemType;
+            board[row][col+3] = gemType;
+        }
+
+        // Returns the first valid swap as {row, col, r2, c2}, or null if none exists.
+        function findFirstMove() {
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
+                    for (const [dr, dc] of [[0, 1], [1, 0]]) {
+                        const r2 = row + dr;
+                        const c2 = col + dc;
+                        if (r2 >= BOARD_SIZE || c2 >= BOARD_SIZE) continue;
+
+                        // Temporarily swap
+                        let temp = board[row][col];
+                        board[row][col] = board[r2][c2];
+                        board[r2][c2] = temp;
+
+                        const found = findMatches().length > 0;
+
+                        // Revert
+                        temp = board[row][col];
+                        board[row][col] = board[r2][c2];
+                        board[r2][c2] = temp;
+
+                        if (found) return { row, col, r2, c2 };
+                    }
+                }
+            }
+            return null;
+        }
+
+        // Check whether the board has any possible moves
+        function hasPossibleMove() {
+            return findFirstMove() !== null;
+        }
+
+        // Show a hint
+        function showHint() {
+            if (isHintVisible || isSwapping || isProcessingMatches || gameTime <= 0 || gameEnded) return;
+
+            const move = findFirstMove();
+            if (!move) return;
+
+            playSound('hint');
+
+            const gems = document.querySelectorAll('.gem');
+            gems[move.row * BOARD_SIZE + move.col].classList.add('hint');
+            gems[move.r2  * BOARD_SIZE + move.c2 ].classList.add('hint');
+
+            isHintVisible = true;
+            clearTimeout(hintTimeout);
+            hintTimeout = setTimeout(clearHint, 2000);
+        }
+
+        // Clear the hint
+        function clearHint() {
+            const hintGems = document.querySelectorAll('.gem.hint');
+            hintGems.forEach(gem => gem.classList.remove('hint'));
+            isHintVisible = false;
+        }
+
+        // Render the game board
+        function renderBoard() {
+            const boardElement = document.getElementById('board');
+            boardElement.innerHTML = '';
+
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
+                    const gemType = board[row][col];
+                    const gemElement = document.createElement('div');
+
+                    gemElement.className = `gem ${gemType}`;
+                    gemElement.dataset.row = row;
+                    gemElement.dataset.col = col;
+                    gemElement.addEventListener('click', handleGemClick);
+
+                    // Add the fall class only to gems that should fall
+                    const key = `${row},${col}`;
+                    if (fallingGems.includes(key)) {
+                        gemElement.classList.add('fall');
+                    }
+
+                    boardElement.appendChild(gemElement);
+                }
+            }
+
+            // Clear the falling-gem list after rendering
+            fallingGems = [];
+        }
+
+        // Handle gem click
+        function handleGemClick(event) {
+            if (isSwapping || isProcessingMatches || gameTime <= 0 || gameEnded) return;
+
+            // Clear the hint on click
+            clearHint();
+
+            const clickedGem = event.target;
+            const row = parseInt(clickedGem.dataset.row);
+            const col = parseInt(clickedGem.dataset.col);
+
+            if (!selectedGem) {
+                // First gem selection
+                selectedGem = {row, col, element: clickedGem};
+                clickedGem.classList.add('selected');
+                playSound('select');
+            } else {
+                // Second gem selection - check if it's adjacent
+                const selectedRow = selectedGem.row;
+                const selectedCol = selectedGem.col;
+
+                if ((Math.abs(row - selectedRow) === 1 && col === selectedCol) ||
+                    (Math.abs(col - selectedCol) === 1 && row === selectedRow)) {
+                    // Adjacent gems - try to swap
+                    swapGems(selectedRow, selectedCol, row, col);
+
+                    // Reset selection
+                    selectedGem.element.classList.remove('selected');
+                    selectedGem = null;
+                } else {
+                    // Not adjacent - switch selection
+                    selectedGem.element.classList.remove('selected');
+                    selectedGem = {row, col, element: clickedGem};
+                    clickedGem.classList.add('selected');
+                    playSound('select');
+                }
+            }
+        }
+
+        // Swap two gems with animation
+        function swapGems(row1, col1, row2, col2) {
+            isSwapping = true;
+            playSound('swap');
+
+            // Determine the swap direction to choose the right animation
+            let gem1Direction = '';
+            let gem2Direction = '';
+
+            if (row1 === row2) {
+                // Horizontal swap
+                if (col1 < col2) {
+                    gem1Direction = 'swap-right';
+                    gem2Direction = 'swap-left';
+                } else {
+                    gem1Direction = 'swap-left';
+                    gem2Direction = 'swap-right';
+                }
+            } else {
+                // Vertical swap
+                if (row1 < row2) {
+                    gem1Direction = 'swap-down';
+                    gem2Direction = 'swap-up';
+                } else {
+                    gem1Direction = 'swap-up';
+                    gem2Direction = 'swap-down';
+                }
+            }
+
+            // Find the gem DOM elements
+            const gems = document.querySelectorAll('.gem');
+            const gem1Index = row1 * BOARD_SIZE + col1;
+            const gem2Index = row2 * BOARD_SIZE + col2;
+            const gem1 = gems[gem1Index];
+            const gem2 = gems[gem2Index];
+
+            // Add animation classes
+            gem1.classList.add(gem1Direction);
+            gem2.classList.add(gem2Direction);
+
+            // Swap gem types in the data model
+            const tempType = board[row1][col1];
+            board[row1][col1] = board[row2][col2];
+            board[row2][col2] = tempType;
+
+            // After the animation finishes, check whether it created a match
+            setTimeout(() => {
+                // Check whether the swap created matches
+                const matches = findMatches();
+                const hasMatches = matches.length > 0;
+
+                if (!hasMatches) {
+                    // If there are no matches, move the gems back
+                    playSound('noMatch');
+
+                    // Restore the data model
+                    const tempType = board[row1][col1];
+                    board[row1][col1] = board[row2][col2];
+                    board[row2][col2] = tempType;
+
+                    // Clear the swap animation classes
+                    gem1.classList.remove(gem1Direction);
+                    gem2.classList.remove(gem2Direction);
+
+                    // Add the revert animations
+                    const backDirection1 = gem1Direction + '-back';
+                    const backDirection2 = gem2Direction + '-back';
+
+                    gem1.classList.add(backDirection1);
+                    gem2.classList.add(backDirection2);
+
+                    // After the revert animation finishes
+                    setTimeout(() => {
+                        // Clear the revert animation classes
+                        gem1.classList.remove(backDirection1);
+                        gem2.classList.remove(backDirection2);
+
+                        isSwapping = false;
+                    }, 300);
+                } else {
+                    // If there are matches, update the visuals and remove them
+
+                    // Remove the swap animation classes
+                    gem1.classList.remove(gem1Direction);
+                    gem2.classList.remove(gem2Direction);
+
+                    // Update gem classes to match the data model
+                    gem1.className = `gem ${board[row1][col1]}`;
+                    gem2.className = `gem ${board[row2][col2]}`;
+
+                    // Save state after a successful move
+                    saveGameState();
+
+                    // Start the match check and removal flow
+                    checkAndRemoveMatches();
+                    isSwapping = false;
+                }
+            }, 300);
+        }
+
+        // Check for matches and remove them
+        function checkAndRemoveMatches() {
+            isProcessingMatches = true;
+            const matches = findMatches();
+
+            if (matches.length === 0) {
+                isProcessingMatches = false;
+                return false;
+            }
+
+            playSound('match');
+
+            // Mark matched gems for visual effect
+            for (const match of matches) {
+                for (const {row, col} of match) {
+                    const index = row * BOARD_SIZE + col;
+                    const gemElement = document.querySelectorAll('.gem')[index];
+                    gemElement.classList.add('matched');
+                }
+            }
+
+            // Update score
+            let matchCount = 0;
+            for (const match of matches) {
+                matchCount += match.length;
+            }
+            updateScore(matchCount);
+
+            // Remove matches and drop gems after a delay
+            setTimeout(() => {
+                removeMatches(matches);
+                dropGems();
+
+                // After gems have dropped, check for new matches
+                setTimeout(() => {
+                    const hasNewMatches = checkAndRemoveMatches();
+                    if (!hasNewMatches) {
+                        isProcessingMatches = false;
+
+                        // Once all matches are resolved, make sure the board still has moves
+                        if (!hasPossibleMove()) {
+                            ensurePossibleMove();
+                            renderBoard();
+
+                            // Save state after adding a new move
+                            saveGameState();
+                        }
+                    }
+                }, 500);
+            }, 300);
+
+            return true;
+        }
+
+        // Find all matches on the board
+        function findMatches() {
+            const matches = [];
+
+            // Check horizontal matches
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                let matchStart = 0;
+                let matchLength = 1;
+                let currentType = board[row][0];
+
+                for (let col = 1; col < BOARD_SIZE; col++) {
+                    if (board[row][col] === currentType) {
+                        matchLength++;
+                    } else {
+                        if (matchLength >= 3) {
+                            const match = [];
+                            for (let i = 0; i < matchLength; i++) {
+                                match.push({row, col: matchStart + i});
+                            }
+                            matches.push(match);
+                        }
+
+                        matchStart = col;
+                        matchLength = 1;
+                        currentType = board[row][col];
+                    }
+                }
+
+                // Check for match at the end of the row
+                if (matchLength >= 3) {
+                    const match = [];
+                    for (let i = 0; i < matchLength; i++) {
+                        match.push({row, col: matchStart + i});
+                    }
+                    matches.push(match);
+                }
+            }
+
+            // Check vertical matches
+            for (let col = 0; col < BOARD_SIZE; col++) {
+                let matchStart = 0;
+                let matchLength = 1;
+                let currentType = board[0][col];
+
+                for (let row = 1; row < BOARD_SIZE; row++) {
+                    if (board[row][col] === currentType) {
+                        matchLength++;
+                    } else {
+                        if (matchLength >= 3) {
+                            const match = [];
+                            for (let i = 0; i < matchLength; i++) {
+                                match.push({row: matchStart + i, col});
+                            }
+                            matches.push(match);
+                        }
+
+                        matchStart = row;
+                        matchLength = 1;
+                        currentType = board[row][col];
+                    }
+                }
+
+                // Check for match at the end of the column
+                if (matchLength >= 3) {
+                    const match = [];
+                    for (let i = 0; i < matchLength; i++) {
+                        match.push({row: matchStart + i, col});
+                    }
+                    matches.push(match);
+                }
+            }
+
+            return matches;
+        }
+
+        // Remove matched gems from the board
+        function removeMatches(matches) {
+            for (const match of matches) {
+                for (const {row, col} of match) {
+                    board[row][col] = null;
+                }
+            }
+        }
+
+        // Drop gems down to fill empty spaces
+        function dropGems() {
+            // Clear the falling-gem list before refilling
+            fallingGems = [];
+
+            // For each column
+            for (let col = 0; col < BOARD_SIZE; col++) {
+                let emptySpaces = 0;
+
+                // Start from the bottom and work upwards
+                for (let row = BOARD_SIZE - 1; row >= 0; row--) {
+                    if (board[row][col] === null) {
+                        emptySpaces++;
+                    } else if (emptySpaces > 0) {
+                        // Move gem down by the number of empty spaces
+                        board[row + emptySpaces][col] = board[row][col];
+                        board[row][col] = null;
+
+                        // Mark this gem as falling
+                        fallingGems.push(`${row + emptySpaces},${col}`);
+                    }
+                }
+
+                // Fill the top with new gems
+                for (let row = 0; row < emptySpaces; row++) {
+                    // Generate a random gem while avoiding immediate matches
+                    let gemType;
+                    let attempts = 0;
+                    let validGem = false;
+
+                    while (!validGem && attempts < 10) {
+                        gemType = GEM_TYPES[Math.floor(Math.random() * GEM_TYPES.length)];
+
+                        // Check horizontal neighbors
+                        const horizontalMatch = (col >= 2 &&
+                            board[row][col-1] === gemType &&
+                            board[row][col-2] === gemType);
+
+                        // Check vertical neighbors below only
+                        const verticalMatch = (row + 1 < BOARD_SIZE &&
+                            row + 2 < BOARD_SIZE &&
+                            board[row+1][col] === gemType &&
+                            board[row+2][col] === gemType);
+
+                        if (!horizontalMatch && !verticalMatch) {
+                            validGem = true;
+                        }
+
+                        attempts++;
+                    }
+
+                    // After enough attempts, accept any gem
+                    if (!validGem) {
+                        gemType = GEM_TYPES[Math.floor(Math.random() * GEM_TYPES.length)];
+                    }
+
+                    board[row][col] = gemType;
+
+                    // Mark the new gem as falling
+                    fallingGems.push(`${row},${col}`);
+                }
+            }
+
+            // Render the updated board with falling animation
+            renderBoard();
+
+            // Save state after gems fall
+            saveGameState();
+        }
+
+        // Update the score
+        function updateScore(points) {
+            score += points * 10;
+            document.getElementById('score').textContent = score;
+            document.getElementById('finalScore').textContent = score;
+
+            // Save state after the score changes
+            saveGameState();
+        }
+
+        // Play a sound effect
+        function playSound(soundName) {
+            if (soundEnabled && sounds[soundName]) {
+                sounds[soundName].currentTime = 0;
+                sounds[soundName].play().catch(e => {
+                    // Autoplay might be blocked, this catches the error
+                    console.log("Sound play failed:", e);
+                });
+            }
+        }
+
+        // Toggle sound on/off
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const button = document.getElementById('sound-toggle');
+            if (soundEnabled) {
+                button.textContent = "Mute";
+                button.classList.remove('muted');
+            } else {
+                button.textContent = "Sound";
+                button.classList.add('muted');
+            }
+
+            // Save state after changing sound settings
+            saveGameState();
+        }
+
+        // Start timer
+        function startTimer() {
+            gameTimer = setInterval(() => {
+                gameTime--;
+                document.getElementById('time').textContent = gameTime;
+
+                if (gameTime <= 0) {
+                    clearInterval(gameTimer);
+                    gameTimer = null;
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        // Reset the game timer.
+        // Pass resetToFull=true to start from 60s (new game / restart).
+        // Pass resetToFull=false to resume from the saved gameTime value.
+        function resetTimer(resetToFull = true) {
+            if (gameTimer) {
+                clearInterval(gameTimer);
+                gameTimer = null;
+            }
+
+            if (unlimitedTime) {
+                gameTime = Infinity;
+                document.getElementById('time').textContent = "∞";
+            } else {
+                if (resetToFull) gameTime = 60;
+                document.getElementById('time').textContent = gameTime;
+                if (gameTime > 0) startTimer();
+            }
+        }
+
+        // End the game
+        function endGame() {
+            gameEnded = true;
+            playSound('gameOver');
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOverModal').style.display = 'flex';
+        }
+
+        // Restart the game
+        function restartGame() {
+            gameEnded = false;
+
+            // Clear any hint on restart
+            clearHint();
+
+            // Remove the previous save on restart
+            if (isLocalStorageAvailable()) {
+                localStorage.removeItem('gemstoneManiaState');
+            }
+
+            score = 0;
+            document.getElementById('score').textContent = score;
+
+            // Reset the board
+            createBoard();
+            renderBoard();
+
+            // Reset the timer
+            resetTimer();
+
+            // Reset the game state
+            selectedGem = null;
+            isSwapping = false;
+            isProcessingMatches = false;
+
+            // Check for initial matches
+            checkAndRemoveMatches();
+
+            // Save state after restart
+            saveGameState();
+        }
+
+        // Start the game
+        window.onload = initGame;
+    </script>
+
+
+</body></html>
