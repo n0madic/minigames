@@ -228,6 +228,8 @@
         let lastCell = null;
         let startDot = null;
         let winTimeout = null;
+        let lastTouchX = null;
+        let lastTouchY = null;
 
         const boardEl = document.getElementById('game-board');
         const winScreen = document.getElementById('win-screen');
@@ -474,6 +476,9 @@
                     // Prevent touch scroll
                     el.addEventListener('touchstart', (e) => {
                         e.preventDefault();
+                        const touch = e.touches[0];
+                        lastTouchX = touch.clientX;
+                        lastTouchY = touch.clientY;
                         startPath(cellData);
                     }, {passive: false});
 
@@ -555,25 +560,50 @@
             }
         }
 
+        function processTouchAt(px, py) {
+            const el = document.elementFromPoint(px, py);
+            if (!el) return;
+            const cellEl = el.closest('.cell');
+            if (!cellEl) return;
+            const x = parseInt(cellEl.dataset.x);
+            const y = parseInt(cellEl.dataset.y);
+            if (grid[y] && grid[y][x]) movePath(grid[y][x]);
+        }
+
         function onTouchMove(e) {
             if (!isDrawing) return;
             e.preventDefault();
             const t = e.touches[0];
-            const el = document.elementFromPoint(t.clientX, t.clientY);
-            if (el) {
-                const cellEl = el.closest('.cell');
-                if (cellEl) {
-                    const x = parseInt(cellEl.dataset.x);
-                    const y = parseInt(cellEl.dataset.y);
-                    if (grid[y] && grid[y][x]) movePath(grid[y][x]);
+            const cx = t.clientX, cy = t.clientY;
+
+            if (lastTouchX !== null && lastTouchY !== null) {
+                const dx = cx - lastTouchX;
+                const dy = cy - lastTouchY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const step = cellSize / 3;
+                const steps = Math.max(1, Math.ceil(dist / step));
+
+                for (let i = 1; i <= steps; i++) {
+                    if (!isDrawing) break;
+                    processTouchAt(
+                        lastTouchX + dx * i / steps,
+                        lastTouchY + dy * i / steps
+                    );
                 }
+            } else {
+                processTouchAt(cx, cy);
             }
+
+            lastTouchX = cx;
+            lastTouchY = cy;
         }
 
         function endPath() {
             isDrawing = false;
             lastCell = null;
             startDot = null;
+            lastTouchX = null;
+            lastTouchY = null;
             checkWin();
         }
 
