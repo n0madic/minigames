@@ -686,6 +686,7 @@
             }
 
             if (isFull && allDots) {
+                clearTimeout(winTimeout);
                 winTimeout = setTimeout(() => { winScreen.style.display = 'flex'; }, 100);
             }
         }
