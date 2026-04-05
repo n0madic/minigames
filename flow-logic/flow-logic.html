@@ -2,13 +2,14 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Neon Flow</title>
     <style>
         :root {
             --bg-color: #152030;
             --grid-bg: #0f1724;
             --cell-border: #24344d;
+            --cell-size: 60px;
             --line-width: 16px;
             --dot-size: 60%;
         }
@@ -19,12 +20,21 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
+            height: 100dvh;
+            height: 100vh; /* fallback */
+            height: 100dvh;
             margin: 0;
             color: white;
             overflow: hidden;
             touch-action: none;
+        }
+
+        .header {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 56px 0;
         }
 
         h1 {
@@ -32,30 +42,35 @@
             letter-spacing: 2px;
             text-transform: uppercase;
             text-shadow: 0 0 15px rgba(255,255,255,0.4);
-            margin-bottom: 5px;
+            margin: 0;
+            font-size: clamp(1.3rem, 4.5vw, 2rem);
         }
 
         p {
             color: #6d83a3;
-            font-size: 14px;
-            margin-top: 0;
-            margin-bottom: 20px;
+            font-size: clamp(11px, 2.5vw, 15px);
+            margin: 2px 0 0;
         }
 
         .controls {
-            margin-bottom: 20px;
             display: flex;
-            gap: 15px;
+            gap: 10px;
+            margin-bottom: 8px;
+            width: 100%;
+        }
+
+        .controls button {
+            flex: 1;
         }
 
         button {
             background: transparent;
             border: 2px solid #4fa3d1;
             color: #4fa3d1;
-            padding: 10px 20px;
+            padding: 12px 20px;
             border-radius: 50px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: clamp(14px, 3vw, 16px);
             font-weight: bold;
             text-transform: uppercase;
             transition: 0.2s;
@@ -67,9 +82,25 @@
             box-shadow: 0 0 20px #4fa3d1;
         }
 
+        .board-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            min-height: 0;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+
+        .board-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
         #game-board {
             display: grid;
-            /* Gap 0, borders handled by cells to prevent visual breaks */
             gap: 0;
             border: 4px solid var(--cell-border);
             border-radius: 10px;
@@ -81,7 +112,7 @@
         .cell {
             background-color: var(--grid-bg);
             border: 1px solid var(--cell-border);
-            box-sizing: border-box; /* Important for borders */
+            box-sizing: border-box;
             position: relative;
             display: flex;
             align-items: center;
@@ -110,19 +141,17 @@
             background-color: currentColor;
             box-shadow: 0 0 15px currentColor;
             z-index: 5;
-            border-radius: 10px; /* Smooth segment ends */
+            border-radius: 10px;
         }
 
-        /* Path geometry for seamless joins */
         .path.center { width: var(--line-width); height: var(--line-width); border-radius: 50%; }
-        /* Extend length to overlap cell borders */
         .path.up { width: var(--line-width); height: 60%; top: -10%; left: 50%; transform: translateX(-50%); border-radius: 0; }
         .path.down { width: var(--line-width); height: 60%; bottom: -10%; left: 50%; transform: translateX(-50%); border-radius: 0; }
         .path.left { height: var(--line-width); width: 60%; left: -10%; top: 50%; transform: translateY(-50%); border-radius: 0; }
         .path.right { height: var(--line-width); width: 60%; right: -10%; top: 50%; transform: translateY(-50%); border-radius: 0; }
 
         #win-screen {
-            position: absolute;
+            position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(21, 32, 48, 0.9);
             display: none;
@@ -135,29 +164,40 @@
 
         .win-box {
             background: #1e2f45;
-            padding: 40px;
+            padding: 30px;
             border-radius: 20px;
             border: 2px solid #4fa3d1;
             text-align: center;
             box-shadow: 0 0 40px rgba(79, 163, 209, 0.2);
         }
 
+        @media (max-height: 400px) {
+            .header { padding-top: 4px; }
+            .header h1 { font-size: 0.85rem; }
+            .header p { display: none; }
+            .controls { gap: 6px; margin-bottom: 4px; }
+            button { padding: 4px 10px; }
+        }
     </style>
 </head>
 <body>
 
-    <button onclick="history.back()" style="position:fixed;top:16px;left:16px;z-index:999;background:transparent;border:2px solid #4fa3d1;color:#4fa3d1;width:40px;height:40px;border-radius:50%;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;">&#8249;</button>
+    <button onclick="history.back()" style="position:fixed;top:10px;left:10px;z-index:999;background:transparent;border:2px solid #4fa3d1;color:#4fa3d1;width:36px;height:36px;border-radius:50%;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;">&#8249;</button>
 
-    <div style="position:absolute;top:16px;left:0;right:0;display:flex;flex-direction:column;align-items:center;pointer-events:none;">
+    <div class="header">
         <h1>Flow Logic</h1>
         <p>100% Solvable & Fillable</p>
-        <div class="controls" style="pointer-events:auto;">
-            <button onclick="generateLevel()">New Level</button>
-            <button onclick="restartLevel()">Reset</button>
-        </div>
     </div>
 
-    <div id="game-board"></div>
+    <div class="board-area">
+        <div class="board-wrapper">
+            <div class="controls">
+                <button onclick="generateLevel()">New Level</button>
+                <button onclick="restartLevel()">Reset</button>
+            </div>
+            <div id="game-board"></div>
+        </div>
+    </div>
 
     <div id="win-screen">
         <div class="win-box">
@@ -168,7 +208,7 @@
 
     <script>
         const GRID_SIZE = 6; // 6x6
-        const CELL_SIZE = 60;
+        let cellSize = 60;
 
         // Bright colors
         const PALETTE = [
@@ -191,6 +231,29 @@
         const boardEl = document.getElementById('game-board');
         const winScreen = document.getElementById('win-screen');
 
+        function calculateCellSize() {
+            // Temporarily shrink board so board-area gets its true flex size
+            boardEl.style.gridTemplateColumns = `repeat(${GRID_SIZE}, 1px)`;
+            boardEl.style.gridTemplateRows = `repeat(${GRID_SIZE}, 1px)`;
+
+            const boardArea = document.querySelector('.board-area');
+            const controlsEl = document.querySelector('.controls');
+            const controlsH = controlsEl ? controlsEl.offsetHeight + 6 : 0;
+            const border = 8; // 4px * 2
+
+            const contentW = boardArea.clientWidth - 16; // 8px padding * 2
+            const contentH = boardArea.clientHeight - 16 - controlsH;
+
+            const maxBoard = Math.min(contentW, contentH) - border;
+            cellSize = Math.max(30, Math.floor(maxBoard / GRID_SIZE));
+            const lineWidth = Math.max(6, Math.round(cellSize * 16 / 60));
+            document.documentElement.style.setProperty('--cell-size', cellSize + 'px');
+            document.documentElement.style.setProperty('--line-width', lineWidth + 'px');
+
+            boardEl.style.gridTemplateColumns = `repeat(${GRID_SIZE}, ${cellSize}px)`;
+            boardEl.style.gridTemplateRows = `repeat(${GRID_SIZE}, ${cellSize}px)`;
+        }
+
         // ============================================================
         // SOLVABLE LEVEL GENERATOR
         // ============================================================
@@ -211,10 +274,10 @@
 
             if (!success) {
                 console.warn("Не удалось сгенерировать сложный уровень, пробую упрощенный...");
-                // Fall back to simple logic if we get extremely unlucky (very rare)
                 fallbackGenerator();
             }
 
+            calculateCellSize();
             initDOM();
         }
 
@@ -382,8 +445,6 @@
 
         function initDOM() {
             boardEl.innerHTML = '';
-            boardEl.style.gridTemplateColumns = `repeat(${GRID_SIZE}, ${CELL_SIZE}px)`;
-            boardEl.style.gridTemplateRows = `repeat(${GRID_SIZE}, ${CELL_SIZE}px)`;
 
             for(let y=0; y<GRID_SIZE; y++) {
                 for(let x=0; x<GRID_SIZE; x++) {
@@ -620,6 +681,13 @@
                 winTimeout = setTimeout(() => { winScreen.style.display = 'flex'; }, 100);
             }
         }
+
+        // Resize handler for orientation changes and window resize
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => calculateCellSize(), 100);
+        });
 
         // Start game
         generateLevel();

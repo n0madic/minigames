@@ -1,64 +1,93 @@
 <!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://code.jquery.com https://unpkg.com https://d3js.org https://threejs.org https://cdn.plot.ly https://stackpath.bootstrapcdn.com https://maps.googleapis.com https://cdn.tailwindcss.com https://ajax.googleapis.com https://kit.fontawesome.com https://cdn.datatables.net https://maxcdn.bootstrapcdn.com https://code.highcharts.com https://tako-static-assets-production.s3.amazonaws.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://pfst.cf2.poecdn.net https://puc.poecdn.net https://i.imgur.com https://wikimedia.org https://*.icons8.com https://*.giphy.com https://picsum.photos https://images.unsplash.com; frame-src 'self' https://www.youtube.com https://trytako.com; child-src 'self'; manifest-src 'self'; worker-src 'self'; upgrade-insecure-requests; block-all-mixed-content;">
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Gemstone Mania</title>
     <style>
+        :root {
+            --gem-size: 40px;
+            --board-width: 356px;
+        }
+
         body {
             font-family: Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            min-height: 100dvh;
+            height: 100dvh;
+            height: 100vh;
+            height: 100dvh;
             background-color: #222;
             color: white;
             margin: 0;
-            padding: 20px;
+            padding: 0;
             box-sizing: border-box;
+            overflow: hidden;
         }
 
         .game-container {
             display: flex;
             flex-direction: column;
             align-items: center;
-            max-width: 100%;
-            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .game-container > h1 {
+            flex-shrink: 0;
+            margin: 60px 0 4px;
+            font-size: clamp(1.3rem, 4.5vw, 1.8rem);
         }
 
         .info-panel {
             display: flex;
             justify-content: space-between;
             width: 100%;
-            max-width: 356px; /* Board size (8*40px + 2*10px padding + 2*2px border + 7*2px gap) */
-            margin-bottom: 10px;
+            margin-bottom: 4px;
         }
 
         .score-board, .time-board {
-            font-size: 18px;
+            font-size: clamp(14px, 2.5vw, 18px);
             background-color: #333;
-            padding: 5px 10px;
+            padding: 4px 10px;
             border-radius: 8px;
             box-shadow: 0 0 5px rgba(0,0,0,0.5);
         }
 
+        .board-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            min-height: 0;
+            padding: 4px 8px;
+            box-sizing: border-box;
+        }
+
+        .board-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+        }
+
         .game-board {
             display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            grid-template-rows: repeat(8, 1fr);
+            grid-template-columns: repeat(8, var(--gem-size));
+            grid-template-rows: repeat(8, var(--gem-size));
             gap: 2px;
             background-color: #444;
             border: 2px solid #555;
             border-radius: 10px;
-            padding: 10px;
-            max-width: 100%;
+            padding: 6px;
             box-sizing: border-box;
-            overflow: hidden; /* Prevents the container from jumping */
-            touch-action: none; /* Required for proper swipe handling */
+            overflow: hidden;
+            touch-action: none;
         }
 
         .gem {
-            width: 40px;
-            height: 40px;
+            width: var(--gem-size);
+            height: var(--gem-size);
             border-radius: 5px;
             display: flex;
             justify-content: center;
@@ -199,30 +228,31 @@
         .orange { background: radial-gradient(circle at 30% 30%, #ff9955, #cc6600); }
 
         .controls {
-            margin-top: 15px;
+            flex-shrink: 0;
+            margin-top: 6px;
             display: flex;
-            gap: 8px;
+            gap: 6px;
             flex-wrap: wrap;
             justify-content: center;
-            width: 100%;
-            max-width: 356px;
+            width: var(--board-width);
+            max-width: calc(100vw - 16px);
         }
 
         button {
             background-color: #4CAF50;
             border: none;
             color: white;
-            padding: 8px 12px;
+            padding: 12px 10px;
             text-align: center;
             text-decoration: none;
             display: inline-block;
-            font-size: 14px;
+            font-size: clamp(14px, 2.5vw, 16px);
             margin: 2px;
             cursor: pointer;
-            border-radius: 5px;
+            border-radius: 8px;
             transition: background-color 0.3s;
             flex: 1;
-            min-width: 70px;
+            min-width: 60px;
         }
 
         button:hover {
@@ -246,10 +276,12 @@
         }
 
         .toggle-container {
+            flex-shrink: 0;
             display: flex;
             align-items: center;
-            margin-top: 10px;
-            gap: 10px;
+            margin: 4px 0 8px;
+            gap: 8px;
+            font-size: clamp(12px, 2vw, 14px);
         }
 
         .switch {
@@ -356,72 +388,20 @@
             font-size: 18px;
         }
 
-        /* Responsive styles */
-        @media (max-width: 500px) {
-            .gem {
-                width: 35px;
-                height: 35px;
-            }
-
-            .info-panel {
-                max-width: 315px; /* Adjusted for smaller gems */
-            }
-
-            .controls {
-                max-width: 315px;
-            }
+        /* Compact layout for short viewports (landscape) */
+        @media (max-height: 500px) {
+            .game-container > h1 { margin: 2px 0; font-size: 0.9rem; }
+            .info-panel { margin-bottom: 2px; }
+            .controls { margin-top: 2px; }
+            .toggle-container { margin: 2px 0 4px; }
+            .game-board { padding: 4px; }
         }
 
         @media (max-width: 400px) {
-            .gem {
-                width: 30px;
-                height: 30px;
-            }
-
-            .info-panel {
-                max-width: 272px; /* Adjusted for smaller gems */
-            }
-
-            .controls {
-                max-width: 272px;
-            }
-
-            .modal-content {
-                padding: 20px;
-            }
-
-            .modal h2 {
-                font-size: 24px;
-            }
-
-            .modal p {
-                font-size: 16px;
-            }
-
-            .modal .score-display {
-                font-size: 28px;
-            }
-        }
-
-        @media (max-width: 350px) {
-            .gem {
-                width: 25px;
-                height: 25px;
-            }
-
-            .info-panel {
-                max-width: 229px; /* Adjusted for smaller gems */
-            }
-
-            .controls {
-                max-width: 229px;
-            }
-
-            button {
-                padding: 6px 8px;
-                font-size: 12px;
-                min-width: 60px;
-            }
+            .modal-content { padding: 20px; }
+            .modal h2 { font-size: 24px; }
+            .modal p { font-size: 16px; }
+            .modal .score-display { font-size: 28px; }
         }
     </style>
 </head>
@@ -430,11 +410,15 @@
 
     <div class="game-container">
         <h1>Gemstone Mania</h1>
-        <div class="info-panel">
-            <div class="score-board">Score: <span id="score">0</span></div>
-            <div class="time-board">Time: <span id="time">60</span></div>
+        <div class="board-area">
+            <div class="board-wrapper">
+                <div class="info-panel">
+                    <div class="score-board">Score: <span id="score">0</span></div>
+                    <div class="time-board">Time: <span id="time">60</span></div>
+                </div>
+                <div class="game-board" id="board"></div>
+            </div>
         </div>
-        <div class="game-board" id="board"></div>
         <div class="controls">
             <button id="restart">Restart</button>
             <button id="hint">Hint</button>
@@ -496,6 +480,41 @@
             hint: new Audio("data:audio/wav;base64,UklGRkQBAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YSABAACA//+A//+A//+A//+A//+A//+A//+A//+A//+A//+A//+AgP//f3////////////////////9/f39/f39/f39/f39/f//////////////////////8/Pz8/Pz8/Pz8/Pz8/P//////////////////////////j4+Pj4+Pj4+Pj4+Pj///////////////////////X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX1///////w=="),
             gameOver: new Audio("data:audio/wav;base64,UklGRroBAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YZYBAACZmZmZmZmZmZmZmZmZmZmZmXd3d3d3d3d3d3d3d3d3d4BhYWFhYWFhYWFhYWFhYaHOzs7Ozs7Ozs7Ozs7OzpZAQEBAQEBAQEBAQEBAPP//////////////////////////////////////////cXFxcXFxcXFxcXFxcXFxiP///////////////////////9TU1NTU1NTU1NTU1NTU1KH//////////////////6ZnZ2dnZ2dnZ2dnZ2dnboP///////////////////9paWlpaWlpaWlpaWlpaXaL////////////////////enp6enp6enp6enp6ent+j4+Pj4+Pj4+Pj4+Pj4+PbGxsbGxsbGxsbGxsbGxoTExMTExMTExMTExMTExIAAAAAAAAAAAAAAAAAAAAAA==")
         };
+
+        function calculateGemSize() {
+            // Temporarily shrink gems so board-area gets its true flex size
+            document.documentElement.style.setProperty('--gem-size', '1px');
+
+            const boardArea = document.querySelector('.board-area');
+            const infoPanel = document.querySelector('.info-panel');
+
+            const infoPanelH = infoPanel ? infoPanel.offsetHeight + 4 : 0;
+            const boardPadding = 12; // 6px each side
+            const boardBorder = 4;  // 2px each side
+            const gaps = 14;        // 7 * 2px
+
+            // board-area has padding: 4px 8px (box-sizing: border-box not set on it,
+            // so clientWidth/Height include padding)
+            const contentW = boardArea.clientWidth - 16;  // 8px * 2
+            const contentH = boardArea.clientHeight - 8;  // 4px * 2
+
+            const availW = contentW - boardPadding - boardBorder - gaps;
+            const availH = contentH - infoPanelH - boardPadding - boardBorder - gaps;
+
+            const gemSize = Math.max(20, Math.floor(Math.min(availW, availH) / BOARD_SIZE));
+
+            document.documentElement.style.setProperty('--gem-size', gemSize + 'px');
+            const boardW = gemSize * BOARD_SIZE + gaps + boardPadding + boardBorder;
+            document.documentElement.style.setProperty('--board-width', boardW + 'px');
+        }
+
+        let gemResizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(gemResizeTimer);
+            gemResizeTimer = setTimeout(() => {
+                calculateGemSize();
+            }, 100);
+        });
 
         // Check whether localStorage is available
         function isLocalStorageAvailable() {
@@ -580,10 +599,10 @@
             const loaded = loadGameState();
 
             if (!loaded) {
-                // If no save exists, create a new game
                 createBoard();
             }
 
+            calculateGemSize();
             renderBoard();
 
             // Set up game timer — preserve saved time on resume, reset on fresh game
@@ -1332,6 +1351,7 @@
 
             // Reset the board
             createBoard();
+            calculateGemSize();
             renderBoard();
 
             // Reset the timer
