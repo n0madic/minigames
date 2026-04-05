@@ -375,12 +375,16 @@
         }
 
         function findFirstEmpty(map) {
-            for(let y=0; y<GRID_SIZE; y++) {
-                for(let x=0; x<GRID_SIZE; x++) {
-                    if (!map[y][x]) return {x, y};
+            // Collect all empty cells and pick one at random
+            // to avoid always starting paths from the top-left corner
+            const empty = [];
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    if (!map[y][x]) empty.push({x, y});
                 }
             }
-            return null;
+            if (empty.length === 0) return null;
+            return empty[Math.floor(Math.random() * empty.length)];
         }
 
         function countFreeNeighbors(cell, map) {
