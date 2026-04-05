@@ -226,6 +226,7 @@
         let isDrawing = false;
         let currentPathColor = null;
         let lastCell = null;
+        let startDot = null;
         let winTimeout = null;
 
         const boardEl = document.getElementById('game-board');
@@ -508,6 +509,7 @@
                 isDrawing = true;
                 currentPathColor = cell.color;
                 lastCell = cell;
+                startDot = cell;
 
                 // If a dot was clicked, erase the old line of this color
                 clearPath(currentPathColor);
@@ -537,16 +539,17 @@
                 return;
             }
 
-            // 2. Blocking: cannot move onto another color or dot
+            // 2. Blocking: cannot move onto another color, occupied cell, or back to start dot
             if (cell.isDot && cell.color !== currentPathColor) return;
+            if (cell === startDot) return; // Cannot loop back to the starting dot
             if (!cell.isDot && cell.lineColor !== null) return; // Occupied
 
             // 3. Draw forward
             connect(lastCell, cell, currentPathColor);
             lastCell = cell;
 
-            // 4. Victory? (If we reached a dot of the same color)
-            if (cell.isDot && cell.color === currentPathColor) {
+            // 4. Path complete? Only when reaching the OTHER dot of the same color
+            if (cell.isDot && cell.color === currentPathColor && cell !== startDot) {
                 isDrawing = false;
                 checkWin();
             }
@@ -570,6 +573,7 @@
         function endPath() {
             isDrawing = false;
             lastCell = null;
+            startDot = null;
             checkWin();
         }
 
